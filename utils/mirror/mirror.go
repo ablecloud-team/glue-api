@@ -115,6 +115,25 @@ func GetRemoteConfigure(client *goph.Client) (clusterConf model.MirrorConf, err 
 	return clusterConf, nil
 }
 
+func ImageInfo(poolName string, imageName string) (imageInfo model.ImageInfo, err error) {
+
+	var stdoutMirrorPreSetup []byte
+
+	strMirrorPreSetupOutput := exec.Command("rbd", "info", "--image", imageName, "--format", "json", "--pretty-format")
+	stdoutMirrorPreSetup, err = strMirrorPreSetupOutput.CombinedOutput()
+	if err != nil {
+		err = errors.New(string(stdoutMirrorPreSetup))
+		utils.FancyHandleError(err)
+		return
+	}
+
+	if err = json.Unmarshal(stdoutMirrorPreSetup, &imageInfo); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	return imageInfo, err
+}
+
 func ImageList() (MirrorList model.MirrorList, err error) {
 
 	var stdRemote []byte
@@ -157,7 +176,12 @@ func Status() (mirrorStatus model.MirrorStatus, err error) {
 	stdout, err = cmd.CombinedOutput()
 
 	if err != nil {
-		err = errors.Join(err, errors.New(out.String()))
+		if strings.Contains(string(stdout), "mirroring not enabled on the pool") {
+			err = errors.New(string(stdout))
+		} else {
+			cmd.Stderr = &out
+			err = errors.Join(err, errors.New(out.String()))
+		}
 		utils.FancyHandleError(err)
 		return
 	}
@@ -166,6 +190,25 @@ func Status() (mirrorStatus model.MirrorStatus, err error) {
 		return
 	}
 	mirrorStatus = tmpdat.Summary
+	return
+}
+
+func ImagePreDelete(poolName string, imageName string) (output string, err error) {
+
+	var stdoutMirrorPreDelete []byte
+
+	info, err := ImageInfo(poolName, imageName)
+	if info.Parent.Image != "" {
+		stdoutMirrorPreDeleteOutput := exec.Command("rbd", "mirror", "image", "disable", "--pool", poolName, "--image", info.Parent.Image, "snapshot")
+		stdoutMirrorPreDelete, err = stdoutMirrorPreDeleteOutput.CombinedOutput()
+		if err != nil {
+			err = errors.New(string(stdoutMirrorPreDelete))
+			utils.FancyHandleError(err)
+			return
+		}
+	}
+
+	output = string(stdoutMirrorPreDelete)
 	return
 }
 
@@ -192,6 +235,25 @@ func ImageDelete(poolName string, imageName string) (output string, err error) {
 	}
 
 	output = string(stdRemove)
+	return
+}
+
+func ImagePreSetup(poolName string, imageName string) (output string, err error) {
+
+	var stdoutMirrorPreSetupEnable []byte
+
+	info, err := ImageInfo(poolName, imageName)
+	if info.Parent.Image != "" {
+		stdoutMirrorPreSetupEnableOutput := exec.Command("rbd", "mirror", "image", "enable", "--pool", poolName, "--image", info.Parent.Image, "snapshot")
+		stdoutMirrorPreSetupEnable, err = stdoutMirrorPreSetupEnableOutput.CombinedOutput()
+		if err != nil {
+			err = errors.New(string(stdoutMirrorPreSetupEnable))
+			utils.FancyHandleError(err)
+			return
+		}
+	}
+
+	output = string(stdoutMirrorPreSetupEnable)
 	return
 }
 
@@ -238,18 +300,18 @@ func ImageStatus(poolName string, imageName string) (imageStatus model.ImageStat
 
 	strScheduleOutput := exec.Command("rbd", "mirror", "image", "status", "--pool", poolName, "--image", imageName, "--format", "json")
 	stdoutScheduleEnable, err = strScheduleOutput.CombinedOutput()
-
-	if err = json.Unmarshal(stdoutScheduleEnable, &imageStatus); err != nil {
-		err = errors.Join(err, errors.New(string(stdoutScheduleEnable)))
-		utils.FancyHandleError(err)
-		return
-	}
 	if err != nil {
 		err = errors.Join(err, errors.New(string(stdoutScheduleEnable)))
 		utils.FancyHandleError(err)
 		return
 	}
-	return
+
+	if err = json.Unmarshal(stdoutScheduleEnable, &imageStatus); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	return imageStatus, err
 }
 
 func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken string, EncodedRemoteToken string, err error) {
@@ -265,16 +327,16 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 
 	// Mirror Enable
 	cmd := exec.Command("rbd", "mirror", "pool", "enable", "--site-name", dat.LocalClusterName, "-p", dat.MirrorPool, "image")
-	cmd.Stderr = &out
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
-	if err != nil || (out.String() != "" && out.String() != "rbd: mirroring is already configured for image mode") {
+	if err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
 
 	// Mirror Daemon Deploy
 	cmd = exec.Command("ceph", "orch", "apply", "rbd-mirror")
-	cmd.Stderr = &out
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
 	if err != nil {
 		utils.FancyHandleError(err)
@@ -283,10 +345,10 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 
 	// Mirror Bootstrap
 	cmd = exec.Command("rbd", "mirror", "pool", "peer", "bootstrap", "create", "--site-name", dat.LocalClusterName, "-p", dat.MirrorPool)
-	cmd.Stderr = &out
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
 	DecodedLocalToken, err := base64.StdEncoding.DecodeString(string(stdout))
-	if err != nil || out.String() != "" {
+	if err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
@@ -295,20 +357,18 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		utils.FancyHandleError(err)
 		return
 	}
-	//println("ceph", "auth", "caps", "client."+LocalToken.ClientId, "mgr", "'profile rbd'", "mon", "'profile rbd-mirror-peer'", "osd", "'profile rbd'")
-	cmd = exec.Command("ceph", "auth", "caps", "client."+LocalToken.ClientId, "mgr", "profile rbd", "mon", "profile rbd-mirror-peer", "osd", "profile rbd")
-	cmd.Stderr = &out
-	stdout, err = cmd.CombinedOutput()
 
+	cmd = exec.Command("ceph", "auth", "caps", "client."+LocalToken.ClientId, "mgr", "profile rbd", "mon", "profile rbd-mirror-peer", "osd", "profile rbd")
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
 	if err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
 
 	cmd = exec.Command("ceph", "auth", "get-key", "client."+LocalToken.ClientId, "--format", "json")
-	cmd.Stderr = &out
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
-
 	if err != nil {
 		utils.FancyHandleError(err)
 		return
@@ -318,7 +378,7 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		return
 	}
 
-	//Generate Token
+	// Generate Token
 	LocalToken.Key = LocalKey.Key
 	JsonLocalKey, err := json.Marshal(LocalToken)
 	if err != nil {
@@ -327,12 +387,16 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 	}
 	EncodedLocalToken = base64.StdEncoding.EncodeToString(JsonLocalKey)
 	localTokenFile, err := os.CreateTemp("", "localtoken")
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
 
-	defer localTokenFile.Close()
-	defer os.Remove(localTokenFile.Name())
+	// defer localTokenFile.Close()
+	// defer os.Remove(localTokenFile.Name())
 	localTokenFile.WriteString(EncodedLocalToken)
 
-	//  For Remote
+	// For Remote
 	client, err := utils.ConnectSSH(dat.Host, privkeyname)
 	utils.FancyHandleError(err)
 	if err != nil {
@@ -351,15 +415,11 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
-	//println("out: " + string(stdout))
-	//println("err: " + out.String())
+	// println("out: " + string(stdout))
+	// println("err: " + out.String())
 	if err != nil {
-		utils.FancyHandleError(err)
-		return
-	} else if out.String() != "" && out.String() == "rbd: mirroring is already configured for image mode" {
-		err = errors.New(out.String())
 		utils.FancyHandleError(err)
 		return
 	}
@@ -370,7 +430,7 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
 		utils.FancyHandleError(err)
@@ -383,14 +443,15 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	//println("out: " + string(stdout))
 	//println("err: " + out.String())
-	if err != nil || out.String() != "" {
+	if err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
+
 	DecodedRemoteoken, err := base64.StdEncoding.DecodeString(string(stdout))
 	if err != nil {
 		utils.FancyHandleError(err)
@@ -401,15 +462,16 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		utils.FancyHandleError(err)
 		return
 	}
-	//println("ceph", "auth", "caps", "client."+RemoteToken.ClientId, "mgr", "'profile rbd'", "mon", "'profile rbd-mirror-peer'", "osd", "'profile rbd'")
+
 	sshcmd, err = client.Command("ceph", "auth", "caps", "client."+RemoteToken.ClientId, "mgr", "'profile rbd'", "mon", "'profile rbd-mirror-peer'", "osd", "'profile rbd'")
 	if err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
@@ -417,18 +479,20 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 
 	sshcmd, err = client.Command("ceph", "auth", "get-key", "client."+RemoteToken.ClientId, "--format", "json")
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
-	if err = json.Unmarshal(stdout, &LocalKey); err != nil {
+	if err = json.Unmarshal(stdout, &RemoteKey); err != nil {
 		utils.FancyHandleError(err)
 		return
 	}
@@ -441,18 +505,25 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		return
 	}
 	EncodedRemoteToken = base64.StdEncoding.EncodeToString(JsonRemoteKey)
+	remoteTokenFile, err := os.CreateTemp("", "remotetoken")
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	remoteTokenFile.WriteString(EncodedRemoteToken)
 
 	// token import
-
 	sshcmd, err = client.Command("echo", EncodedLocalToken, ">", remoteTokenFileName)
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
@@ -460,13 +531,15 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 
 	sshcmd, err = client.Command("rbd", "mirror", "pool", "info", "--pool", dat.MirrorPool, "--format", "json")
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
@@ -481,13 +554,15 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		for _, peer := range remoteMirrorInfo.Peers {
 			sshcmd, err = client.Command("rbd", "mirror", "pool", "peer", "remove", "--pool", dat.MirrorPool, peer.Uuid)
 			if err != nil {
+				sshcmd.Stderr = &out
 				err = errors.Join(err, errors.New(out.String()))
 				utils.FancyHandleError(err)
 				return
 			}
-			sshcmd.Stderr = &out
+			// sshcmd.Stderr = &out
 			stdout, err = sshcmd.CombinedOutput()
 			if err != nil {
+				sshcmd.Stderr = &out
 				err = errors.Join(err, errors.New(out.String()))
 				utils.FancyHandleError(err)
 				return
@@ -497,34 +572,39 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 
 	sshcmd, err = client.Command("rbd", "mirror", "pool", "peer", "bootstrap", "import", "--pool", dat.MirrorPool, "--token-path", remoteTokenFileName)
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
-	sshcmd.Stderr = &out
+	// sshcmd.Stderr = &out
 	stdout, err = sshcmd.CombinedOutput()
 	if err != nil {
+		sshcmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
 	}
 
 	out.Reset()
-	println(EncodedRemoteToken)
-	cmd.Stderr = &out
-	stdout, err = cmd.CombinedOutput()
-	println("out: " + string(stdout))
-	println("err:" + string(out.String()))
-	if err != nil {
-		err = errors.Join(err, errors.New(out.String()))
-		utils.FancyHandleError(err)
-		return
-	}
+	// println(EncodedRemoteToken)
+	// cmd.Stderr = &out
+	// stdout, err = cmd.CombinedOutput()
+	// println("out: " + string(stdout))
+	// println("err:" + string(out.String()))
+	// if err != nil {
+	// 	println("out.Reset() err")
+	// 	cmd.Stderr = &out
+	// 	err = errors.Join(err, errors.New(out.String()))
+	// 	utils.FancyHandleError(err)
+	// 	return
+	// }
 
 	cmd = exec.Command("rbd", "mirror", "pool", "info", "--pool", dat.MirrorPool, "--format", "json")
-	cmd.Stderr = &out
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
 	if err != nil {
+		cmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
@@ -539,9 +619,10 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 	if len(localMirrorInfo.Peers) != 0 {
 		for _, peer := range localMirrorInfo.Peers {
 			cmd = exec.Command("rbd", "mirror", "pool", "peer", "remove", "--pool", dat.MirrorPool, peer.Uuid)
-			cmd.Stderr = &out
+			// cmd.Stderr = &out
 			stdout, err = cmd.CombinedOutput()
 			if err != nil {
+				cmd.Stderr = &out
 				err = errors.Join(err, errors.New(out.String()))
 				utils.FancyHandleError(err)
 				return
@@ -549,24 +630,14 @@ func ConfigMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken 
 		}
 	}
 
-	cmd = exec.Command("cat", localTokenFile.Name())
-	cmd.Stderr = &out
+	cmd = exec.Command("rbd", "mirror", "pool", "peer", "bootstrap", "import", "--pool", dat.MirrorPool, "--token-path", remoteTokenFile.Name())
+	// cmd.Stderr = &out
 	stdout, err = cmd.CombinedOutput()
-	println(string(stdout))
 	if err != nil {
+		cmd.Stderr = &out
 		err = errors.Join(err, errors.New(out.String()))
 		utils.FancyHandleError(err)
 		return
-
-	}
-	cmd = exec.Command("rbd", "mirror", "pool", "peer", "bootstrap", "import", "--pool", dat.MirrorPool, "--token-path", localTokenFile.Name())
-	cmd.Stderr = &out
-	stdout, err = cmd.CombinedOutput()
-	if err != nil {
-		err = errors.Join(err, errors.New(out.String()))
-		utils.FancyHandleError(err)
-		return
-
 	}
 	return
 }
@@ -629,6 +700,290 @@ func RemoteImageDemote(poolName string, imageName string) (imageStatus model.Ima
 	}
 	if err != nil {
 		utils.FancyHandleError(err)
+	}
+	return
+}
+
+func EnableMirror(dat model.MirrorSetup, privkeyname string) (EncodedLocalToken string, EncodedRemoteToken string, err error) {
+
+	var LocalToken model.MirrorToken
+	var RemoteToken model.MirrorToken
+	var out strings.Builder
+	var LocalKey model.AuthKey
+	var RemoteKey model.AuthKey
+	var stdout []byte
+
+	remoteTokenFileName := "/tmp/remoteToken"
+
+	// Mirror Enable
+	cmd := exec.Command("rbd", "mirror", "pool", "enable", "--site-name", dat.LocalClusterName, "-p", dat.MirrorPool, "image")
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	// Mirror Bootstrap
+	cmd = exec.Command("rbd", "mirror", "pool", "peer", "bootstrap", "create", "--site-name", dat.LocalClusterName, "-p", dat.MirrorPool)
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
+	DecodedLocalToken, err := base64.StdEncoding.DecodeString(string(stdout))
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	if err = json.Unmarshal(DecodedLocalToken, &LocalToken); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	cmd = exec.Command("ceph", "auth", "get-key", "client."+LocalToken.ClientId, "--format", "json")
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	if err = json.Unmarshal(stdout, &LocalKey); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	// Generate Token
+	LocalToken.Key = LocalKey.Key
+	JsonLocalKey, err := json.Marshal(LocalToken)
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	EncodedLocalToken = base64.StdEncoding.EncodeToString(JsonLocalKey)
+	localTokenFile, err := os.CreateTemp("", "localtoken")
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	// defer localTokenFile.Close()
+	// defer os.Remove(localTokenFile.Name())
+	localTokenFile.WriteString(EncodedLocalToken)
+
+	// For Remote
+	client, err := utils.ConnectSSH(dat.Host, privkeyname)
+	utils.FancyHandleError(err)
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	//// Defer closing the network connection.
+	defer client.Close()
+	//
+	//// Execute your command.
+
+	// Mirror Enable
+	out.Reset()
+	sshcmd, err := client.Command("rbd", "mirror", "pool", "enable", "--site-name", dat.RemoteClusterName, "-p", dat.MirrorPool, "image")
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	// println("out: " + string(stdout))
+	// println("err: " + out.String())
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	// Mirror Bootstrap
+	sshcmd, err = client.Command("rbd", "mirror", "pool", "peer", "bootstrap", "create", "--site-name", dat.RemoteClusterName, "-p", dat.MirrorPool)
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	//println("out: " + string(stdout))
+	//println("err: " + out.String())
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	DecodedRemoteoken, err := base64.StdEncoding.DecodeString(string(stdout))
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	if err = json.Unmarshal(DecodedRemoteoken, &RemoteToken); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	sshcmd, err = client.Command("ceph", "auth", "get-key", "client."+RemoteToken.ClientId, "--format", "json")
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	if err = json.Unmarshal(stdout, &RemoteKey); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	//Generate Token
+	RemoteToken.Key = RemoteKey.Key
+	JsonRemoteKey, err := json.Marshal(RemoteToken)
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	EncodedRemoteToken = base64.StdEncoding.EncodeToString(JsonRemoteKey)
+	remoteTokenFile, err := os.CreateTemp("", "remotetoken")
+	if err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+	remoteTokenFile.WriteString(EncodedRemoteToken)
+
+	// token import
+	sshcmd, err = client.Command("echo", EncodedLocalToken, ">", remoteTokenFileName)
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+
+	sshcmd, err = client.Command("rbd", "mirror", "pool", "info", "--pool", dat.MirrorPool, "--format", "json")
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	var remoteMirrorInfo model.MirrorInfo
+	if err = json.Unmarshal(stdout, &remoteMirrorInfo); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	if len(remoteMirrorInfo.Peers) != 0 {
+		for _, peer := range remoteMirrorInfo.Peers {
+			sshcmd, err = client.Command("rbd", "mirror", "pool", "peer", "remove", "--pool", dat.MirrorPool, peer.Uuid)
+			if err != nil {
+				sshcmd.Stderr = &out
+				err = errors.Join(err, errors.New(out.String()))
+				utils.FancyHandleError(err)
+				return
+			}
+			// sshcmd.Stderr = &out
+			stdout, err = sshcmd.CombinedOutput()
+			if err != nil {
+				sshcmd.Stderr = &out
+				err = errors.Join(err, errors.New(out.String()))
+				utils.FancyHandleError(err)
+				return
+			}
+		}
+	}
+
+	sshcmd, err = client.Command("rbd", "mirror", "pool", "peer", "bootstrap", "import", "--pool", dat.MirrorPool, "--token-path", remoteTokenFileName)
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+	// sshcmd.Stderr = &out
+	stdout, err = sshcmd.CombinedOutput()
+	if err != nil {
+		sshcmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+
+	out.Reset()
+	// println(EncodedRemoteToken)
+	// cmd.Stderr = &out
+	// stdout, err = cmd.CombinedOutput()
+	// println("out: " + string(stdout))
+	// println("err:" + string(out.String()))
+	// if err != nil {
+	// 	println("out.Reset() err")
+	// 	cmd.Stderr = &out
+	// 	err = errors.Join(err, errors.New(out.String()))
+	// 	utils.FancyHandleError(err)
+	// 	return
+	// }
+
+	cmd = exec.Command("rbd", "mirror", "pool", "info", "--pool", dat.MirrorPool, "--format", "json")
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
+	if err != nil {
+		cmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
+	}
+
+	var localMirrorInfo model.MirrorInfo
+	if err = json.Unmarshal(stdout, &localMirrorInfo); err != nil {
+		utils.FancyHandleError(err)
+		return
+	}
+
+	if len(localMirrorInfo.Peers) != 0 {
+		for _, peer := range localMirrorInfo.Peers {
+			cmd = exec.Command("rbd", "mirror", "pool", "peer", "remove", "--pool", dat.MirrorPool, peer.Uuid)
+			// cmd.Stderr = &out
+			stdout, err = cmd.CombinedOutput()
+			if err != nil {
+				cmd.Stderr = &out
+				err = errors.Join(err, errors.New(out.String()))
+				utils.FancyHandleError(err)
+				return
+			}
+		}
+	}
+
+	cmd = exec.Command("rbd", "mirror", "pool", "peer", "bootstrap", "import", "--pool", dat.MirrorPool, "--token-path", remoteTokenFile.Name())
+	// cmd.Stderr = &out
+	stdout, err = cmd.CombinedOutput()
+	if err != nil {
+		cmd.Stderr = &out
+		err = errors.Join(err, errors.New(out.String()))
+		utils.FancyHandleError(err)
+		return
 	}
 	return
 }

@@ -247,18 +247,19 @@ func main() {
 			mirror.POST("", c.MirrorSetup) //Setup Mirroring
 			//mirror.PATCH("", c.MirrorUpdate)  //Configure Mirroring
 			mirror.DELETE("", c.MirrorDelete) //Unconfigure Mirroring
-			//
+			mirror.POST("/:mirrorPool", c.MirrorPoolEnable) //Enable Mirroring Cluster
+			mirror.DELETE("/:mirrorPool", c.MirrorPoolDisable) //Disable Mirroring Cluster
 			mirrorimage := mirror.Group("/image")
 			{
 				mirrorimage.GET("", c.MirrorImageList)                             //List Mirroring Images
-				mirrorimage.GET("/:mirrorPool/:imageName", c.MirrorImageInfo)      //Get Image Mirroring Status
+				mirrorimage.GET("/:mirrorPool/:imageName", c.MirrorImageInfo)      //Get Image Mirroring Info
 				mirrorimage.POST("/:mirrorPool/:imageName", c.MirrorImageSetup)    //Setup Image Mirroring
 				mirrorimage.PATCH("/:mirrorPool/:imageName", c.MirrorImageUpdate)  //Config Image Mirroring
 				mirrorimage.DELETE("/:mirrorPool/:imageName", c.MirrorImageDelete) //Unconfigure Mirroring
 
-				mirrorimage.GET("/promote/:mirrorPool/:imageName", c.MirrorImagestatus)   //Promote Image
-				mirrorimage.POST("/promote/:mirrorPool/:imageName", c.MirrorImagePromote) //
-				mirrorimage.DELETE("/promote/:mirrorPool/:imageName", c.MirrorImageDemote)
+				mirrorimage.GET("/status/:mirrorPool/:imageName", c.MirrorImageStatus)   //Get Image Mirroring Status
+				mirrorimage.POST("/promote/:mirrorPool/:imageName", c.MirrorImagePromote) //Promote Image
+				mirrorimage.DELETE("/demote/:mirrorPool/:imageName", c.MirrorImageDemote) //Demote Image
 			}
 			//
 			//

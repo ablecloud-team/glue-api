@@ -2237,6 +2237,82 @@ const docTemplate = `{
                     }
                 }
             },
+            "post": {
+                "description": "Glue 의 미러링 클러스터를 설정합니다.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Setup Mirroring Cluster",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Local Cluster Name",
+                        "name": "localClusterName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Name",
+                        "name": "remoteClusterName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Host Address",
+                        "name": "host",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Remote Cluster PrivateKey",
+                        "name": "privateKeyFile",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pool Name for Mirroring",
+                        "name": "mirrorPool",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MirrorSetup"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "description": "Glue 의 미러링 클러스터를 제거합니다.",
                 "consumes": [
@@ -2249,6 +2325,146 @@ const docTemplate = `{
                     "Mirror"
                 ],
                 "summary": "Delete Mirroring Cluster",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Host Address",
+                        "name": "host",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Remote Cluster PrivateKey",
+                        "name": "privateKeyFile",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pool Name for Mirroring",
+                        "name": "mirrorPool",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MirrorSetup"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mirror/{mirrorPool}": {
+            "post": {
+                "description": "Glue 의 미러링 클러스터를 활성화합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Enable Mirroring Cluster",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Local Cluster Name",
+                        "name": "localClusterName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Name",
+                        "name": "remoteClusterName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Host Address",
+                        "name": "host",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Remote Cluster PrivateKey",
+                        "name": "privateKeyFile",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pool Name for Mirroring",
+                        "name": "mirrorPool",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MirrorSetup"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Glue 의 미러링 클러스터를 비활성화합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Disable Mirroring Cluster",
                 "parameters": [
                     {
                         "type": "string",
@@ -2341,7 +2557,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/promote/{mirrorPool}/{imageName}": {
+        "/api/v1/mirror/image/status/{mirrorPool}/{imageName}": {
             "get": {
                 "description": "Glue 의 이미지에 미러링상태를 확인합니다.",
                 "consumes": [
@@ -2353,7 +2569,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Patch Image Mirroring",
+                "summary": "Show Mirroring Image Status",
                 "parameters": [
                     {
                         "type": "string",
@@ -2396,9 +2612,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/mirror/image/promote/{mirrorPool}/{imageName}": {
             "post": {
-                "description": "Glue 의 이미지를 활성화 합니다.",
+                "description": "Glue 의 이미지를 Promote 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2451,9 +2669,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/mirror/image/demote/{mirrorPool}/{imageName}": {
             "delete": {
-                "description": "Glue 의 이미지를 활성화 합니다.",
+                "description": "Glue 의 이미지를 Demote 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2463,7 +2683,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Promote Image Mirroring",
+                "summary": "Demote Image Mirroring",
                 "parameters": [
                     {
                         "type": "string",
