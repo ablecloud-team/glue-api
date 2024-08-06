@@ -127,3 +127,16 @@ type ImageStatus struct {
 		MirrorPeerUuids []string `json:"mirror_peer_uuids"`
 	} `json:"snapshots"`
 } //@name ImageStatus
+
+type ImageInfo struct {
+	Name          string   `json:"name"`
+	Id            string   `json:"id"`
+	Size          int64    `json:"size"`
+	SnapshotCount int64    `json:"snapshot_count"`
+	Features      []string `json:"features"`
+	Parent        struct {
+		Pool     string `json:"pool"`
+		Image    string `json:"image"`
+		Snapshot string `json:"snapshot"`
+	} `json:"parent"`
+} //@name ImageInfo

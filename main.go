@@ -251,19 +251,29 @@ func main() {
 			//Todo
 			mirror.POST("", c.MirrorSetup) //Setup Mirroring
 			//mirror.PATCH("", c.MirrorUpdate)  //Configure Mirroring
-			mirror.DELETE("", c.MirrorDelete) //Unconfigure Mirroring
-			//
+			mirror.DELETE("", c.MirrorDelete)                  //Unconfigure Mirroring
+			mirror.POST("/:mirrorPool", c.MirrorPoolEnable)    //Enable Mirroring Cluster
+			mirror.DELETE("/:mirrorPool", c.MirrorPoolDisable) //Disable Mirroring Cluster
+			mirrorgarbage := mirror.Group("/garbage")
+			{
+				mirrorgarbage.DELETE("", c.MirrorDeleteGarbage) //Delete Mirroring Cluster Garbage
+			}
 			mirrorimage := mirror.Group("/image")
 			{
 				mirrorimage.GET("", c.MirrorImageList)                             //List Mirroring Images
-				mirrorimage.GET("/:mirrorPool/:imageName", c.MirrorImageInfo)      //Get Image Mirroring Status
+				mirrorimage.GET("/:mirrorPool/:imageName", c.MirrorImageInfo)      //Get Image Mirroring Info
 				mirrorimage.POST("/:mirrorPool/:imageName", c.MirrorImageSetup)    //Setup Image Mirroring
-				mirrorimage.PATCH("/:mirrorPool/:imageName", c.MirrorImageUpdate)  //Config Image Mirroring
+				mirrorimage.PUT("/:mirrorPool/:imageName", c.MirrorImageUpdate)    //Config Image Mirroring
 				mirrorimage.DELETE("/:mirrorPool/:imageName", c.MirrorImageDelete) //Unconfigure Mirroring
 
-				mirrorimage.GET("/promote/:mirrorPool/:imageName", c.MirrorImagestatus)   //Promote Image
-				mirrorimage.POST("/promote/:mirrorPool/:imageName", c.MirrorImagePromote) //
-				mirrorimage.DELETE("/promote/:mirrorPool/:imageName", c.MirrorImageDemote)
+				mirrorimage.GET("/info/:mirrorPool/:imageName", c.MirrorImageParentInfo)           //Get Image Mirroring Parent Info
+				mirrorimage.GET("/status/:mirrorPool/:imageName", c.MirrorImageStatus)             //Get Image Mirroring Status
+				mirrorimage.POST("/promote/:mirrorPool/:imageName", c.MirrorImagePromote)          //Promote Image
+				mirrorimage.POST("/promote/peer/:mirrorPool/:imageName", c.MirrorImagePromotePeer) //Promote Peer Image
+				mirrorimage.DELETE("/demote/:mirrorPool/:imageName", c.MirrorImageDemote)          //Demote Image
+				mirrorimage.DELETE("/demote/peer/:mirrorPool/:imageName", c.MirrorImageDemotePeer) //Demote Peer Image
+				mirrorimage.PUT("/resync/:mirrorPool/:imageName", c.MirrorImageResync)             //Resync Image
+				mirrorimage.PUT("/resync/peer/:mirrorPool/:imageName", c.MirrorImageResyncPeer)    //Resync Peer Image
 			}
 			//
 			//
