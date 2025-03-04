@@ -228,7 +228,25 @@ func StartLicenseCheck(password, salt string) error {
 	// 만료일 가져오기
 	expirationDate, err := GetExpirationDate(password, salt)
 	if err != nil {
-		return fmt.Errorf("만료일 가져오기 실패: %v", err)
+		currentTime = time.Now().Format("2006-01-02 15:04:05")
+		log.Printf("[%s] 라이센스 파일이 없거나 읽을 수 없습니다: %v", currentTime, err)
+		log.Printf("[%s] 라이센스 파일이 없어 호스트 에이전트를 정지합니다.", currentTime)
+
+		// 라이센스 파일이 없는 경우 호스트 에이전트 정지
+		cmd := exec.Command("systemctl", "stop", "mold-agent")
+		if err := cmd.Run(); err != nil {
+			log.Printf("[%s] 호스트 에이전트 정지 실패: %v", currentTime, err)
+		}
+
+		// 10분마다 로그 출력
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			currentTime = time.Now().Format("2006-01-02 15:04:05")
+			log.Printf("[%s] 라이센스 파일이 없어 호스트 에이전트를 정지합니다.", currentTime)
+		}
+		return nil
 	}
 
 	// 만료 여부 확인
