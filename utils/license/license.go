@@ -164,19 +164,7 @@ func GetExpirationDate(password, salt string) (string, error) {
 func CheckLicenseExpiration(expirationDate string) {
 	// 최초 실행 시 만료 여부 확인
 	expired := isLicenseExpired(expirationDate)
-	controlHostAgent(expired)
-
-	// 만료된 경우에만 10분마다 체크
-	if expired {
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			expired = isLicenseExpired(expirationDate)
-			controlHostAgent(expired)
-			log.Printf("라이센스 체크 완료: 만료=%v", expired)
-		}
-	}
+	ControlHostAgent(expired)
 }
 
 // isLicenseExpired는 라이센스 만료 여부를 확인합니다
@@ -197,22 +185,22 @@ func isLicenseExpired(expirationDate string) bool {
 }
 
 // controlHostAgent는 호스트 에이전트를 제어합니다
-func controlHostAgent(expired bool) {
+func ControlHostAgent(flag bool) {
 	var cmd *exec.Cmd
 	var action string
 
-	if expired {
-		// 만료되었으면 정지
-		cmd = exec.Command("systemctl", "stop", "mold-agent")
-		action = "정지"
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
-		log.Printf("[%s] 라이센스 만료: 호스트 에이전트를 %s합니다", currentTime, action)
-	} else {
-		// 유효하면 시작 (최초 실행 시에만)
+	if flag {
+		// Mold Agent 시작
 		cmd = exec.Command("systemctl", "start", "mold-agent")
 		action = "시작"
 		currentTime := time.Now().Format("2006-01-02 15:04:05")
 		log.Printf("[%s] 라이센스 유효: 호스트 에이전트를 %s합니다", currentTime, action)
+	} else {
+		// Mold Agent 정지
+		cmd = exec.Command("systemctl", "stop", "mold-agent")
+		action = "정지"
+		currentTime := time.Now().Format("2006-01-02 15:04:05")
+		log.Printf("[%s] 라이센스 만료: 호스트 에이전트를 %s합니다", currentTime, action)
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -220,50 +208,22 @@ func controlHostAgent(expired bool) {
 	}
 }
 
-// StartLicenseCheck는 라이센스 체크를 시작합니다
-func StartLicenseCheck(password, salt string) error {
+// IsLicenseExpired는 라이센스 만료일을 체크합니다
+func IsLicenseExpired(password, salt string) (bool, error) {
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 	log.Printf("[%s] 라이센스 체크 시작", currentTime)
 
 	// 만료일 가져오기
 	expirationDate, err := GetExpirationDate(password, salt)
+
 	if err != nil {
-		currentTime = time.Now().Format("2006-01-02 15:04:05")
-		log.Printf("[%s] 라이센스 파일이 없거나 읽을 수 없습니다: %v", currentTime, err)
-		log.Printf("[%s] 라이센스 파일이 없어 호스트 에이전트를 정지합니다.", currentTime)
-
-		// 라이센스 파일이 없는 경우 호스트 에이전트 정지
-		cmd := exec.Command("systemctl", "stop", "mold-agent")
-		if err := cmd.Run(); err != nil {
-			log.Printf("[%s] 호스트 에이전트 정지 실패: %v", currentTime, err)
-		}
-
-		// 10분마다 로그 출력
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			currentTime = time.Now().Format("2006-01-02 15:04:05")
-			log.Printf("[%s] 라이센스 파일이 없어 호스트 에이전트를 정지합니다.", currentTime)
-		}
-		return nil
+		// 라이센스 파일이 없거나 읽을 수 없는 경우 true 반환
+		return true, nil
 	}
 
 	// 만료 여부 확인
 	expired := isLicenseExpired(expirationDate)
-	if !expired {
-		// 유효한 경우 최초 한 번만 에이전트 시작
-		currentTime = time.Now().Format("2006-01-02 15:04:05")
-		log.Printf("[%s] 라이센스 유효: 호스트 에이전트를 시작합니다", currentTime)
-		cmd := exec.Command("systemctl", "start", "mold-agent")
-		if err := cmd.Run(); err != nil {
-			log.Printf("호스트 에이전트 시작 실패: %v", err)
-		}
-	}
-
-	// 라이센스 체크 시작
-	CheckLicenseExpiration(expirationDate)
-	return nil
+	return expired, nil
 }
 
 // 가장 최근 라이센스 파일을 찾고 .lic 파일로 변환하는 함수
