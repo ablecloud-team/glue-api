@@ -20,7 +20,7 @@ import (
 )
 
 type License_type struct {
-	ExpiryDate string `json:"expiry_date"`
+	ExpiryDate string `json:"expired"`
 }
 
 func License() (output []string, err error) {
@@ -154,7 +154,7 @@ func GetExpirationDate(password, salt string) (string, error) {
 	}
 
 	if license.ExpiryDate == "" {
-		return "", fmt.Errorf("expiry_date 필드를 찾을 수 없음")
+		return "", fmt.Errorf("expired 필드를 찾을 수 없음")
 	}
 
 	log.Printf("추출된 만료일: %s", license.ExpiryDate)
@@ -227,7 +227,6 @@ func IsLicenseExpired(password, salt string) (bool, error) {
 	return expired, nil
 }
 
-// getHostUUID는 /etc/machine-id에서 호스트 UUID를 읽어옵니다
 func getHostUUID() (string, error) {
 	// /etc/machine-id 파일에서 UUID 읽기
 	data, err := ioutil.ReadFile("/etc/machine-id")
@@ -251,14 +250,36 @@ func getLatestLicenseFile(_ string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Printf("호스트 UUID: %s", hostUUID)
 
-	// 라이센스 파일 찾기
-	licenseFile := filepath.Join("/usr/share", hostUUID)
+	// 라이센스 파일 경로 생성
+	licensePath := filepath.Join("/usr/share", hostUUID)
+	log.Printf("라이센스 디렉토리 경로: %s", licensePath)
 
-	// 파일 존재 여부 확인
-	if _, err := os.Stat(licenseFile); os.IsNotExist(err) {
-		return "", fmt.Errorf("라이센스 파일을 찾을 수 없습니다: %s", licenseFile)
+	// 디렉토리 존재 여부 확인
+	if _, err := os.Stat(licensePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("라이센스 디렉토리를 찾을 수 없습니다: %s", licensePath)
 	}
 
-	return licenseFile, nil
+	files, err := ioutil.ReadDir(licensePath)
+	if err != nil {
+		return "", err
+	}
+
+	if len(files) == 0 {
+		return "", fmt.Errorf("라이센스 파일을 찾을 수 없습니다: %s", licensePath)
+	}
+
+	// 가장 최근 파일 찾기
+	var latestFile os.FileInfo
+	for _, file := range files {
+		if latestFile == nil || file.ModTime().After(latestFile.ModTime()) {
+			latestFile = file
+		}
+	}
+
+	finalPath := filepath.Join(licensePath, latestFile.Name())
+	log.Printf("찾은 라이센스 파일 경로: %s", finalPath)
+
+	return finalPath, nil
 }
