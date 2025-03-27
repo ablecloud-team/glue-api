@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -226,28 +227,38 @@ func IsLicenseExpired(password, salt string) (bool, error) {
 	return expired, nil
 }
 
-// 가장 최근 라이센스 파일을 찾고 .lic 파일로 변환하는 함수
-func getLatestLicenseFile(dirPath string) (string, error) {
-	files, err := ioutil.ReadDir(dirPath)
+// getHostUUID는 /etc/machine-id에서 호스트 UUID를 읽어옵니다
+func getHostUUID() (string, error) {
+	// /etc/machine-id 파일에서 UUID 읽기
+	data, err := ioutil.ReadFile("/etc/machine-id")
+	if err != nil {
+		return "", fmt.Errorf("호스트 UUID를 읽을 수 없습니다: %v", err)
+	}
+
+	// 공백 제거 및 문자열 반환
+	uuid := strings.TrimSpace(string(data))
+	if uuid == "" {
+		return "", fmt.Errorf("호스트 UUID가 비어있습니다")
+	}
+
+	return uuid, nil
+}
+
+// 라이센스 파일을 찾는 함수
+func getLatestLicenseFile(_ string) (string, error) {
+	// 호스트 UUID 읽기
+	hostUUID, err := getHostUUID()
 	if err != nil {
 		return "", err
 	}
 
-	var latestFile string
-	var latestTime time.Time
+	// 라이센스 파일 찾기
+	licenseFile := filepath.Join("/usr/share", hostUUID)
 
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".lic") {
-			if latestFile == "" || file.ModTime().After(latestTime) {
-				latestFile = filepath.Join(dirPath, file.Name())
-				latestTime = file.ModTime()
-			}
-		}
+	// 파일 존재 여부 확인
+	if _, err := os.Stat(licenseFile); os.IsNotExist(err) {
+		return "", fmt.Errorf("라이센스 파일을 찾을 수 없습니다: %s", licenseFile)
 	}
 
-	if latestFile == "" {
-		return "", fmt.Errorf("라이센스 파일을 찾을 수 없습니다")
-	}
-
-	return latestFile, nil
+	return licenseFile, nil
 }
