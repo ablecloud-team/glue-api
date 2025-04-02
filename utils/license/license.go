@@ -21,6 +21,7 @@ import (
 
 type License_type struct {
 	ExpiryDate string `json:"expired"`
+	IssuedDate string `json:"issued"`
 }
 
 func License() (output []string, err error) {
@@ -99,36 +100,36 @@ func GenerateKeyAndIV(password, salt string) (key []byte, iv []byte, err error) 
 	return key, iv, nil
 }
 
-// GetExpirationDate는 라이센스 파일에서 만료일을 가져옵니다
-func GetExpirationDate(password, salt string) (string, error) {
+// GetExpirationDate는 라이센스 파일에서 만료일과 발급일을 가져옵니다
+func GetExpirationDate(password, salt string) (string, string, error) {
 	// key와 iv 생성
 	key, iv, err := GenerateKeyAndIV(password, salt)
 	if err != nil {
-		return "", fmt.Errorf("key/iv 생성 실패: %v", err)
+		return "", "", fmt.Errorf("key/iv 생성 실패: %v", err)
 	}
 
 	// 가장 최근 라이센스 파일 경로 가져오기
 	latestLicense, err := getLatestLicenseFile("/root")
 	if err != nil {
-		return "", fmt.Errorf("최신 라이센스 파일 찾기 실패: %v", err)
+		return "", "", fmt.Errorf("최신 라이센스 파일 찾기 실패: %v", err)
 	}
 
 	// 라이센스 파일 읽기
 	licenseData, err := ioutil.ReadFile(latestLicense)
 	if err != nil {
-		return "", fmt.Errorf("라이센스 파일 읽기 실패: %v", err)
+		return "", "", fmt.Errorf("라이센스 파일 읽기 실패: %v", err)
 	}
 
 	// base64 디코딩
 	ciphertext, err := base64.StdEncoding.DecodeString(string(licenseData))
 	if err != nil {
-		return "", fmt.Errorf("라이센스 파일 디코딩 실패: %v", err)
+		return "", "", fmt.Errorf("라이센스 파일 디코딩 실패: %v", err)
 	}
 
 	// AES 복호화 블록 생성
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", fmt.Errorf("암호화 블록 생성 실패: %v", err)
+		return "", "", fmt.Errorf("암호화 블록 생성 실패: %v", err)
 	}
 
 	// CBC 모드로 복호화
@@ -139,26 +140,30 @@ func GetExpirationDate(password, salt string) (string, error) {
 	// PKCS7 패딩 제거
 	length := len(plaintext)
 	if length == 0 {
-		return "", fmt.Errorf("복호화된 데이터가 비어있습니다")
+		return "", "", fmt.Errorf("복호화된 데이터가 비어있습니다")
 	}
 	unpadding := int(plaintext[length-1])
 	if unpadding > length {
-		return "", fmt.Errorf("잘못된 패딩")
+		return "", "", fmt.Errorf("잘못된 패딩")
 	}
 	plaintext = plaintext[:(length - unpadding)]
 
 	// License_type으로 직접 파싱
 	var license License_type
 	if err := json.Unmarshal(plaintext, &license); err != nil {
-		return "", fmt.Errorf("라이센스 JSON 파싱 실패: %v", err)
+		return "", "", fmt.Errorf("라이센스 JSON 파싱 실패: %v", err)
 	}
 
 	if license.ExpiryDate == "" {
-		return "", fmt.Errorf("expired 필드를 찾을 수 없음")
+		return "", "", fmt.Errorf("expired 필드를 찾을 수 없음")
 	}
 
-	log.Printf("추출된 만료일: %s", license.ExpiryDate)
-	return license.ExpiryDate, nil
+	if license.IssuedDate == "" {
+		return "", "", fmt.Errorf("issued 필드를 찾을 수 없음")
+	}
+
+	log.Printf("추출된 만료일: %s, 발급일: %s", license.ExpiryDate, license.IssuedDate)
+	return license.ExpiryDate, license.IssuedDate, nil
 }
 
 // CheckLicenseExpiration은 라이센스 만료 여부를 확인하고 호스트 에이전트를 제어합니다
@@ -174,33 +179,83 @@ func isLicenseExpired(expirationDate string) bool {
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
-	// 만료일 파싱
-	expDate, err := time.Parse("2006-01-02", expirationDate)
-	if err != nil {
-		log.Printf("만료일 파싱 실패: %v\n", err)
-		return true // 파싱 실패시 만료된 것으로 처리
+	// 시작일과 만료일 분리 (형식: "2024-01-01~2024-12-31")
+	dates := strings.Split(expirationDate, "~")
+	if len(dates) != 2 {
+		log.Printf("잘못된 날짜 형식: %s\n", expirationDate)
+		return true
 	}
 
-	// 만료일이 오늘 이후면 유효함 (만료일 당일까지 유효)
-	return today.After(expDate)
+	// 발급일 파싱
+	issuedDate, err := time.Parse("2006-01-02", strings.TrimSpace(dates[0]))
+	if err != nil {
+		log.Printf("발급일 파싱 실패: %v\n", err)
+		return true
+	}
+
+	// 만료일 파싱
+	endDate, err := time.Parse("2006-01-02", strings.TrimSpace(dates[1]))
+	if err != nil {
+		log.Printf("만료일 파싱 실패: %v\n", err)
+		return true
+	}
+
+	// 현재 날짜가 발급일보다 이전이거나 만료일 이후면 라이센스 무효
+	if today.Before(issuedDate) {
+		log.Printf("현재 날짜가 발급일(%s) 이전입니다", issuedDate.Format("2006-01-02"))
+		return true
+	}
+
+	if today.After(endDate) {
+		log.Printf("현재 날짜가 만료일(%s) 이후입니다", endDate.Format("2006-01-02"))
+		return true
+	}
+
+	return false
 }
 
-// controlHostAgent는 호스트 에이전트를 제어합니다
+// ControlHostAgent는 호스트 에이전트를 제어합니다
 func ControlHostAgent(flag bool) {
 	var cmd *exec.Cmd
 	var action string
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
 
+	// 현재 시간과 발급일 비교를 위해 라이센스 정보 가져오기
+	_, issuedDate, err := GetExpirationDate("password", "salt")
+	if err != nil {
+		log.Printf("[%s] 라이센스 정보 조회 실패: %v", currentTime, err)
+		// 라이센스 정보 조회 실패 시 에이전트 중지
+		stopAgent(currentTime)
+		return
+	}
+
+	// 발급일 파싱
+	issued, err := time.Parse("2006-01-02", issuedDate)
+	if err != nil {
+		log.Printf("[%s] 발급일 파싱 실패: %v", currentTime, err)
+		stopAgent(currentTime)
+		return
+	}
+
+	// 현재 시간
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	// 발급일 이전이면 에이전트 중지
+	if today.Before(issued) {
+		log.Printf("[%s] 아직 라이센스 시작일(%s)이 되지 않았습니다", currentTime, issuedDate)
+		stopAgent(currentTime)
+		return
+	}
+
+	// 라이센스가 유효하고 시작일이 지났을 때
 	if flag {
-		// Mold Agent 시작
 		cmd = exec.Command("systemctl", "start", "mold-agent")
 		action = "시작"
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
 		log.Printf("[%s] 라이센스 유효: 호스트 에이전트를 %s합니다", currentTime, action)
 	} else {
-		// Mold Agent 정지
 		cmd = exec.Command("systemctl", "stop", "mold-agent")
 		action = "정지"
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
 		log.Printf("[%s] 라이센스 만료: 호스트 에이전트를 %s합니다", currentTime, action)
 	}
 
@@ -209,22 +264,51 @@ func ControlHostAgent(flag bool) {
 	}
 }
 
-// IsLicenseExpired는 라이센스 만료일을 체크합니다
-func IsLicenseExpired(password, salt string) (bool, error) {
+// 에이전트 중지를 위한 헬퍼 함수
+func stopAgent(currentTime string) {
+	cmd := exec.Command("systemctl", "stop", "mold-agent")
+	if err := cmd.Run(); err != nil {
+		log.Printf("[%s] 호스트 에이전트 정지 실패: %v", currentTime, err)
+	} else {
+		log.Printf("[%s] 호스트 에이전트를 정지했습니다", currentTime)
+	}
+}
+
+// IsLicenseExpired는 라이센스 만료일과 시작일을 체크합니다
+func IsLicenseExpired(password, salt string) (expired bool, isBeforeIssueDate bool, err error) {
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 	log.Printf("[%s] 라이센스 체크 시작", currentTime)
 
-	// 만료일 가져오기
-	expirationDate, err := GetExpirationDate(password, salt)
-
+	// 만료일과 발급일 가져오기
+	expirationDate, issuedDate, err := GetExpirationDate(password, salt)
 	if err != nil {
 		// 라이센스 파일이 없거나 읽을 수 없는 경우 true 반환
-		return true, nil
+		return true, true, nil
 	}
 
+	// 현재 시간
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	// 발급일 파싱
+	issued, err := time.Parse("2006-01-02", issuedDate)
+	if err != nil {
+		return true, true, fmt.Errorf("발급일 파싱 실패: %v", err)
+	}
+
+	// 만료일 파싱
+	expiry, err := time.Parse("2006-01-02", expirationDate)
+	if err != nil {
+		return true, true, fmt.Errorf("만료일 파싱 실패: %v", err)
+	}
+
+	// 시작일 이전 여부 확인
+	isBeforeIssueDate = today.Before(issued)
+
 	// 만료 여부 확인
-	expired := isLicenseExpired(expirationDate)
-	return expired, nil
+	expired = today.After(expiry)
+
+	return expired, isBeforeIssueDate, nil
 }
 
 func getHostUUID() (string, error) {

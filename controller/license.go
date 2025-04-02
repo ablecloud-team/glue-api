@@ -48,35 +48,39 @@ func (c *Controller) License(ctx *gin.Context) {
 func (c *Controller) IsLicenseExpired(ctx *gin.Context) {
 	ctx.Header("Access-Control-Allow-Origin", "*")
 
-	expirationDate, err := license.GetExpirationDate("password", "salt")
+	expirationDate, issuedDate, err := license.GetExpirationDate("password", "salt")
 	if err != nil {
 		// 에러 발생 시 만료된 것으로 간주하고 에이전트 중지
 		license.ControlHostAgent(false) // agent 중지
 		ctx.JSON(http.StatusOK, gin.H{
 			"expired":     "",
+			"issued":      "",
 			"expiry_date": true,
+			"issued_date": true,
 			"error":       err.Error(),
 		})
 		return
 	}
 
-	expired, err := license.IsLicenseExpired("password", "salt")
+	expired, issued, err := license.IsLicenseExpired("password", "salt")
 	if err != nil {
 		utils.FancyHandleError(err)
 		httputil.NewError(ctx, http.StatusInternalServerError, err)
 		return
 	}
 
-	// 만료 여부에 따라 에이전트 제어
-	if expired {
-		license.ControlHostAgent(false) // 만료되었으면 agent 중지
+	// 만료 여부 또는 시작일 이전 여부에 따라 에이전트 제어
+	if expired || issued {
+		license.ControlHostAgent(false) // 만료되었거나 시작일 이전이면 agent 중지
 	} else {
 		license.ControlHostAgent(true) // 유효하면 agent 시작
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"expired":     expirationDate,
+		"issued":      issuedDate,
 		"expiry_date": expired,
+		"issued_date": issued,
 	})
 }
 
