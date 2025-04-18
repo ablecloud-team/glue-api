@@ -229,34 +229,27 @@ func ControlHostAgent(flag bool) {
 		return
 	}
 
-	// 발급일 파싱
-	issued, err := time.Parse("2006-01-02", issuedDate)
+	// 라이센스 상태 확인
+	expired, isBeforeIssueDate, err := IsLicenseExpired("password", "salt")
 	if err != nil {
-		log.Printf("[%s] 발급일 파싱 실패: %v", currentTime, err)
+		log.Printf("[%s] 라이센스 상태 확인 실패: %v", currentTime, err)
 		stopAgent(currentTime)
 		return
 	}
 
-	// 현재 시간
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-
-	// 발급일 이전이면 에이전트 중지
-	if today.Before(issued) {
-		log.Printf("[%s] 아직 라이센스 시작일(%s)이 되지 않았습니다", currentTime, issuedDate)
-		stopAgent(currentTime)
-		return
-	}
-
-	// 라이센스가 유효하고 시작일이 지났을 때
-	if flag {
+	// 라이센스가 유효하고 시작일 이전이 아닌 경우에만 시작
+	if !expired && !isBeforeIssueDate {
 		cmd = exec.Command("systemctl", "start", "mold-agent")
 		action = "시작"
 		log.Printf("[%s] 라이센스 유효: 호스트 에이전트를 %s합니다", currentTime, action)
 	} else {
 		cmd = exec.Command("systemctl", "stop", "mold-agent")
 		action = "정지"
-		log.Printf("[%s] 라이센스 만료: 호스트 에이전트를 %s합니다", currentTime, action)
+		if isBeforeIssueDate {
+			log.Printf("[%s] 아직 라이센스 시작일(%s)이 되지 않았습니다", currentTime, issuedDate)
+		} else {
+			log.Printf("[%s] 라이센스 만료: 호스트 에이전트를 %s합니다", currentTime, action)
+		}
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -282,7 +275,6 @@ func IsLicenseExpired(password, salt string) (expired bool, isBeforeIssueDate bo
 	// 만료일과 발급일 가져오기
 	expirationDate, issuedDate, err := GetExpirationDate(password, salt)
 	if err != nil {
-		// 라이센스 파일이 없거나 읽을 수 없는 경우 true 반환
 		return true, true, nil
 	}
 
@@ -295,6 +287,8 @@ func IsLicenseExpired(password, salt string) (expired bool, isBeforeIssueDate bo
 	if err != nil {
 		return true, true, fmt.Errorf("발급일 파싱 실패: %v", err)
 	}
+	// 시작일도 자정 기준으로 설정
+	issued = time.Date(issued.Year(), issued.Month(), issued.Day(), 0, 0, 0, 0, issued.Location())
 
 	// 만료일 파싱
 	expiry, err := time.Parse("2006-01-02", expirationDate)
@@ -302,10 +296,18 @@ func IsLicenseExpired(password, salt string) (expired bool, isBeforeIssueDate bo
 		return true, true, fmt.Errorf("만료일 파싱 실패: %v", err)
 	}
 
-	// 시작일 이전 여부 확인
-	isBeforeIssueDate = today.Before(issued)
+	// 날짜 비교를 위해 Format을 사용하여 문자열로 변환 후 비교
+	todayStr := today.Format("2006-01-02")
+	issuedStr := issued.Format("2006-01-02")
 
-	// 만료 여부 확인
+	// 시작일과 현재 날짜가 같으면 false 반환
+	if todayStr == issuedStr {
+		isBeforeIssueDate = false
+	} else {
+		isBeforeIssueDate = today.Before(issued)
+	}
+
+	// 만료 여부 확인 (만료일 당일까지는 유효함)
 	expired = today.After(expiry)
 
 	return expired, isBeforeIssueDate, nil
