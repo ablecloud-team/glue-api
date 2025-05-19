@@ -2255,6 +2255,138 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/license": {
+            "get": {
+                "description": "라이센스를 조회합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Show License",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "description": "Lience 상세정보 및 리스트 구조체"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/license/controlHostAgent/{action}": {
+            "get": {
+                "description": "Mold Agent를 제어합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "ControlHostAgent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Agent action(start, stop)",
+                        "name": "action",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "description": "Lience 상세정보 및 리스트 구조체"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/license/isLicenseExpired": {
+            "get": {
+                "description": "라이센스 만료일을 조회합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "IsLicenseExpired",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "description": "Lience 상세정보 및 리스트 구조체"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/mirror": {
             "get": {
                 "description": "Glue 의 미러링 상태를 보여줍니다.",
@@ -2295,105 +2427,8 @@ const docTemplate = `{
                     }
                 }
             },
-            "post": {
-                "description": "Glue 의 미러링 클러스터를 설정합니다.",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Mirror"
-                ],
-                "summary": "Setup Mirroring Cluster",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Local Cluster Name",
-                        "name": "localClusterName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Remote Cluster Name",
-                        "name": "remoteClusterName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Remote Cluster Host Address",
-                        "name": "host",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "Remote Cluster PrivateKey",
-                        "name": "privateKeyFile",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Mold Url",
-                        "name": "moldUrl",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Mold Api Key",
-                        "name": "moldApiKey",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Mold Secret Key",
-                        "name": "moldSecretKey",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/MirrorSetup"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP400BadRequest"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP404NotFound"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP500InternalServerError"
-                        }
-                    }
-                }
-            },
             "put": {
-                "description": "Glue 의 미러링 클러스터 설정을 변경합니다.",
+                "description": "Glue 의 미러링 클러스터의 설정을 변경합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2438,7 +2473,46 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Mold"
+                            "$ref": "#/definitions/model.Mold"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Glue 의 미러링 클러스터를 설정합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Setup Mirroring Cluster",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MirrorSetup"
                         }
                     },
                     "400": {
@@ -2524,149 +2598,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/{mirrorPool}": {
-            "post": {
-                "description": "Glue 의 미러링 클러스터를 활성화합니다.",
-                "consumes": [
-                    "application/x-www-form-urlencoded"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Mirror"
-                ],
-                "summary": "Enable Mirroring Cluster",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Local Cluster Name",
-                        "name": "localClusterName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Remote Cluster Name",
-                        "name": "remoteClusterName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Remote Cluster Host Address",
-                        "name": "host",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "Remote Cluster PrivateKey",
-                        "name": "privateKeyFile",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/MirrorSetup"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP400BadRequest"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP404NotFound"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP500InternalServerError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Glue 의 미러링 클러스터를 비활성화합니다.",
-                "consumes": [
-                    "application/x-www-form-urlencoded"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Mirror"
-                ],
-                "summary": "Disable Mirroring Cluster",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Remote Cluster Host Address",
-                        "name": "host",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "Remote Cluster PrivateKey",
-                        "name": "privateKeyFile",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/MirrorSetup"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP400BadRequest"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP404NotFound"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP500InternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/mirror/garbage": {
             "delete": {
-                "description": "Glue 의 미러링 클러스터 가비지를 삭제합니다.",
+                "description": "Glue 의 미러링 클러스터 가비지를 제거합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2676,16 +2610,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Delete Garbage Mirroring Cluster",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Delete Mirroring Cluster Garbage",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2714,9 +2639,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/{mirrorPool}": {
-            "get": {
-                "description": "미러링중인 이미지의 목록과 상태를 보여줍니다.",
+        "/api/v1/mirror/image/demote/{mirrorPool}/{imageName}": {
+            "delete": {
+                "description": "Peer Glue 의 이미지를 Demote 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2726,12 +2651,19 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Show List of Mirrored Snapshot",
+                "summary": "Peer Demote Image Mirroring",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Pool Name for Mirroring",
                         "name": "mirrorPool",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image Name for Mirroring",
+                        "name": "imageName",
                         "in": "path",
                         "required": true
                     }
@@ -2740,7 +2672,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/MirrorList"
+                            "$ref": "#/definitions/ImageStatus"
                         }
                     },
                     "400": {
@@ -2821,9 +2753,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/status/{mirrorPool}/{imageName}": {
-            "get": {
-                "description": "Glue 의 이미지에 미러링상태를 확인합니다.",
+        "/api/v1/mirror/image/promote/peer/{mirrorPool}/{imageName}": {
+            "post": {
+                "description": "Peer Glue 의 이미지를 Promote 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2833,7 +2765,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Show Mirroring Image Status",
+                "summary": "Peer Promote Image Mirroring",
                 "parameters": [
                     {
                         "type": "string",
@@ -2935,9 +2867,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/promote/peer/{mirrorPool}/{imageName}": {
-            "post": {
-                "description": "Peer Glue 의 이미지를 Promote 합니다.",
+        "/api/v1/mirror/image/resync/peer/{mirrorPool}/{imageName}": {
+            "put": {
+                "description": "Peer Glue 의 이미지를 resync 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -2947,121 +2879,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Promote Peer Image Mirroring",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Image Name for Mirroring",
-                        "name": "imageName",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/ImageStatus"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP400BadRequest"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP404NotFound"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP500InternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/mirror/image/demote/{mirrorPool}/{imageName}": {
-            "delete": {
-                "description": "Glue 의 이미지를 Demote 합니다.",
-                "consumes": [
-                    "application/x-www-form-urlencoded"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Mirror"
-                ],
-                "summary": "Demote Image Mirroring",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Pool Name for Mirroring",
-                        "name": "mirrorPool",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Image Name for Mirroring",
-                        "name": "imageName",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/ImageStatus"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP400BadRequest"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP404NotFound"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/HTTP500InternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/mirror/image/demote/peer/{mirrorPool}/{imageName}": {
-            "delete": {
-                "description": "Peer Glue 의 이미지를 Demote 합니다.",
-                "consumes": [
-                    "application/x-www-form-urlencoded"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Mirror"
-                ],
-                "summary": "Demote Peer Image Mirroring",
+                "summary": "Peer Resync Image Mirroring",
                 "parameters": [
                     {
                         "type": "string",
@@ -3108,7 +2926,7 @@ const docTemplate = `{
         },
         "/api/v1/mirror/image/resync/{mirrorPool}/{imageName}": {
             "put": {
-                "description": "Glue 의 이미지를 Resync 합니다.",
+                "description": "Glue 의 이미지를 resync 합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -3163,9 +2981,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/resync/peer/{mirrorPool}/{imageName}": {
-            "put": {
-                "description": "Peer Glue 의 이미지를 Resync 합니다.",
+        "/api/v1/mirror/image/snapshot/{mirrorPool}/{vmName}": {
+            "post": {
+                "description": "Glue 의 이미지에 미러링 스냅샷을 생성하거나 스케줄을 설정합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -3175,7 +2993,82 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Resync Peer Image Mirroring",
+                "summary": "Take Image Mirroring Snapshot or Setup Image Mirroring Snapshot Schedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool Name for Mirroring",
+                        "name": "mirrorPool",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "VM Name for Mirroring",
+                        "name": "vmName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Host Name for Mirroring VMe",
+                        "name": "hostName",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image Name for Mirroring (Schedule)",
+                        "name": "imageName",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image List for Mirroring (Manual)",
+                        "name": "imageList",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ImageMirror"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mirror/image/status/{mirrorPool}/{imageName}": {
+            "get": {
+                "description": "Glue 의 이미지에 미러링상태를 확인합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Show Mirroring Image Status",
                 "parameters": [
                     {
                         "type": "string",
@@ -3220,6 +3113,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/mirror/image/{mirrorPool}": {
+            "get": {
+                "description": "미러링중인 이미지의 목록과 상태를 보여줍니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Show List of Mirrored Snapshot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "mirrorPool",
+                        "name": "mirrorPool",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MirrorList"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/mirror/image/{mirrorPool}/{imageName}": {
             "get": {
                 "description": "미러링중인 이미지의 정보를 보여줍니다.",
@@ -3232,7 +3175,7 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Show Infomation of Mirrored Snapshot",
+                "summary": "Show Information of Mirrored Snapshot",
                 "parameters": [
                     {
                         "type": "string",
@@ -3362,14 +3305,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Host Name for Mirroring VM",
+                        "description": "Host Name",
                         "name": "hostName",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "VM Name for Mirroring Image",
+                        "description": "VM Name",
                         "name": "vmName",
                         "in": "path",
                         "required": true
@@ -3410,9 +3353,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mirror/image/snapshot/{mirrorPool}/{vmName}": {
+        "/api/v1/mirror/pool/{mirrorPool}": {
             "post": {
-                "description": "Glue 의 이미지에 미러링 스냅샷을 생성하거나 스케줄을 설정합니다.",
+                "description": "Glue 의 미러링 클러스터를 활성화합니다.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -3422,49 +3365,97 @@ const docTemplate = `{
                 "tags": [
                     "Mirror"
                 ],
-                "summary": "Take Image Mirroring Snapshot or Setup Image Mirroring Snapshot Schedule",
+                "summary": "Enable Mirroring",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Host Address",
+                        "name": "host",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Remote Cluster PrivateKey",
+                        "name": "privateKeyFile",
+                        "in": "formData",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Pool Name for Mirroring",
                         "name": "mirrorPool",
-                        "in": "path",
+                        "in": "formData",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "VM Name for Mirroring",
-                        "name": "vmName",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Host Name for Mirroring VM",
-                        "name": "hostName",
-                        "in": "formData",
-                        "required": false
-                    },
-                    {
-                        "type": "string",
-                        "description": "Image Name for Mirroring (Schedule)",
-                        "name": "imageName",
-                        "in": "formData",
-                        "required": false
-                    },
-                    {
-                        "type": "string",
-                        "description": "Image List for Mirroring (Manual)",
-                        "name": "imageList",
-                        "in": "formData",
-                        "required": false
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Message"
+                            "$ref": "#/definitions/ImageStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP400BadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP404NotFound"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/HTTP500InternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Glue 의 미러링 클러스터를 비활성화합니다.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Disable Mirroring",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remote Cluster Host Address",
+                        "name": "host",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Remote Cluster PrivateKey",
+                        "name": "privateKeyFile",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pool Name for Mirroring",
+                        "name": "mirrorPool",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ImageStatus"
                         }
                     },
                     "400": {
@@ -7029,6 +7020,43 @@ const docTemplate = `{
                 }
             }
         },
+        "ImageInfo": {
+            "type": "object",
+            "properties": {
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent": {
+                    "type": "object",
+                    "properties": {
+                        "image": {
+                            "type": "string"
+                        },
+                        "pool": {
+                            "type": "string"
+                        },
+                        "snapshot": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "snapshot_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "ImageMirror": {
             "type": "object",
             "properties": {
@@ -7141,60 +7169,6 @@ const docTemplate = `{
                 }
             }
         },
-        "ImageInfo": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "snapshot_count": {
-                    "type": "integer"
-                },
-                "parent": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "pool": {
-                                "type": "string"
-                            },
-                            "image": {
-                                "type": "string"
-                            },
-                            "snapshot": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "MirrorImage": {
-            "type": "object",
-            "properties": {
-                "image": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/MirrorImageItem"
-                    }
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "pool": {
-                    "type": "string"
-                }
-            }
-        },
         "MirrorImageItem": {
             "type": "object",
             "properties": {
@@ -7209,53 +7183,54 @@ const docTemplate = `{
         "MirrorList": {
             "type": "object",
             "properties": {
-                "Summary": {
+                "daemons": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "ceph_version": {
+                                "type": "string"
+                            },
+                            "client_id": {
+                                "type": "string"
+                            },
+                            "health": {
+                                "type": "string"
+                            },
+                            "hostname": {
+                                "type": "string"
+                            },
+                            "instance_id": {
+                                "type": "string"
+                            },
+                            "leader": {
+                                "type": "boolean"
+                            },
+                            "service_id": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MirrorListImages"
+                    }
+                },
+                "summary": {
                     "type": "object",
                     "properties": {
-                        "health": {
+                        "daemon_health": {
                             "type": "string"
                         },
-                        "daemon_health": {
+                        "health": {
                             "type": "string"
                         },
                         "image_health": {
                             "type": "string"
                         },
-                        "states": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "Daemons": {
-                    "type": "object",
-                    "properties": {
-                        "service_id": {
-                            "type": "string"
-                        },
-                        "instance_id": {
-                            "type": "string"
-                        },
-                        "client_id": {
-                            "type": "string"
-                        },
-                        "hostname": {
-                            "type": "string"
-                        },
-                        "ceph_version": {
-                            "type": "string"
-                        },
-                        "leader": {
-                            "type": "boolean"
-                        },
-                        "health": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "Images": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/MirrorListImages"
+                        "states": {}
                     }
                 }
             }
@@ -7263,22 +7238,17 @@ const docTemplate = `{
         "MirrorListImages": {
             "type": "object",
             "properties": {
-                "name": {
+                "daemon_service": {},
+                "description": {
                     "type": "string"
                 },
                 "global_id": {
                     "type": "string"
                 },
-                "state": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "daemon_service": {
-                    "type": "string"
-                },
                 "last_update": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "peer_sites": {
@@ -7286,23 +7256,26 @@ const docTemplate = `{
                     "items": {
                         "type": "object",
                         "properties": {
-                            "site_name": {
-                                "type": "string"
-                            },
-                            "mirror_uuids": {
-                                "type": "string"
-                            },
-                            "state": {
-                                "type": "string"
-                            },
                             "description": {
                                 "type": "string"
                             },
                             "last_update": {
                                 "type": "string"
+                            },
+                            "mirror_uuids": {
+                                "type": "string"
+                            },
+                            "site_name": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string"
                             }
                         }
                     }
+                },
+                "state": {
+                    "type": "string"
                 }
             }
         },
@@ -7648,6 +7621,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Mold": {
+            "type": "object",
+            "properties": {
+                "mold_api_key": {
+                    "type": "string"
+                },
+                "mold_secret_key": {
+                    "type": "string"
+                },
+                "mold_url": {
                     "type": "string"
                 }
             }
