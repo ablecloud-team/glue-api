@@ -1,12 +1,10 @@
 package license
 
 import (
-	"Glue-API/utils"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -22,65 +20,134 @@ import (
 type License_type struct {
 	ExpiryDate string `json:"expired"`
 	IssuedDate string `json:"issued"`
+	OEM        string `json:"oem"`
 }
 
-func License() (output []string, err error) {
-	var stdout []byte
+type LicenseResponse struct {
+	ExpiryDate string `json:"expired"`
+	IssuedDate string `json:"issued"`
+	OEM        string `json:"oem"`
+	Status     string `json:"status"`
+}
 
-	// name
-	cmd := exec.Command("sh", "-c", "cat /root/license_test | grep 'name' | awk '{print $3}'")
-	stdout, err = cmd.CombinedOutput()
+func License() (string, error) {
+	// 호스트 ID 가져오기
+	hostID, err := ioutil.ReadFile("/etc/machine-id")
 	if err != nil {
-		err_str := strings.ReplaceAll(string(stdout), "\n", "")
-		err = errors.New(err_str)
-		utils.FancyHandleError(err)
-		return
+		log.Printf("machine-id 읽기 실패: %v", err)
+		return "", fmt.Errorf("500")
 	}
-	license_info := strings.ReplaceAll(string(stdout), "\n", "")
-	output = append(output, string(license_info))
 
-	// type
-	cmd = exec.Command("sh", "-c", "cat /root/license_test | grep 'type' | awk '{print $3}'")
-	stdout, err = cmd.CombinedOutput()
+	machineID := strings.TrimSpace(string(hostID))
+	log.Printf("machine ID: %s", machineID)
+
+	// 라이센스 디렉토리 경로
+	licenseDir := filepath.Join("/usr/share", machineID)
+	log.Printf("라이센스 디렉토리 경로: %s", licenseDir)
+
+	// 디렉토리 존재 여부 확인
+	if _, err := os.Stat(licenseDir); os.IsNotExist(err) {
+		log.Printf("라이센스 디렉토리가 없습니다: %s", licenseDir)
+		return "", fmt.Errorf("500")
+	}
+
+	// 디렉토리 내 파일 확인
+	files, err := ioutil.ReadDir(licenseDir)
+	if err != nil || len(files) == 0 {
+		log.Printf("라이센스 파일이 없거나 디렉토리 읽기 실패: %v", err)
+		return "", fmt.Errorf("500")
+	}
+
+	// 라이센스 정보 가져오기
+	key, iv, err := GenerateKeyAndIV("password", "salt")
 	if err != nil {
-		err_str := strings.ReplaceAll(string(stdout), "\n", "")
-		err = errors.New(err_str)
-		utils.FancyHandleError(err)
-		return
+		log.Printf("키 생성 실패: %v", err)
+		return "", fmt.Errorf("500")
 	}
-	licenseType := strings.ReplaceAll(string(stdout), "\n", "")
-	output = append(output, licenseType)
 
-	// core (type에 "vm"이 포함된 경우에만)
-	if strings.Contains(strings.ToLower(licenseType), "vm") {
-		cmd = exec.Command("sh", "-c", "cat /root/license_test | grep 'core' | awk '{print $3}'")
-		stdout, err = cmd.CombinedOutput()
-		if err != nil {
-			err_str := strings.ReplaceAll(string(stdout), "\n", "")
-			err = errors.New(err_str)
-			utils.FancyHandleError(err)
-			return
-		}
-		license_info = strings.ReplaceAll(string(stdout), "\n", "")
-		output = append(output, string(license_info))
+	// 최신 라이센스 파일 읽기
+	latestLicense, err := getLatestLicenseFile("/root")
+	if err != nil {
+		log.Printf("최신 라이센스 파일 읽기 실패: %v", err)
+		return "", fmt.Errorf("500")
+	}
+	log.Printf("최신 라이센스 파일 경로: %s", latestLicense)
+
+	// 라이센스 파일 내용 읽기
+	licenseData, err := ioutil.ReadFile(latestLicense)
+	if err != nil {
+		log.Printf("라이센스 파일 읽기 실패: %v", err)
+		return "", fmt.Errorf("500")
+	}
+
+	// base64 디코딩 및 복호화
+	ciphertext, err := base64.StdEncoding.DecodeString(string(licenseData))
+	if err != nil {
+		log.Printf("라이센스 디코딩 실패: %v, 데이터: %s", err, string(licenseData))
+		return "", fmt.Errorf("500")
+	}
+
+	// AES 복호화
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Printf("암호화 블록 생성 실패: %v", err)
+		return "", fmt.Errorf("500")
+	}
+
+	mode := cipher.NewCBCDecrypter(block, iv)
+	plaintext := make([]byte, len(ciphertext))
+	mode.CryptBlocks(plaintext, ciphertext)
+
+	// PKCS7 패딩 제거
+	length := len(plaintext)
+	unpadding := int(plaintext[length-1])
+	plaintext = plaintext[:(length - unpadding)]
+
+	// JSON 파싱
+	var licenseInfo License_type
+	if err := json.Unmarshal(plaintext, &licenseInfo); err != nil {
+		log.Printf("JSON 파싱 실패: %v, 데이터: %s", err, string(plaintext))
+		return "", fmt.Errorf("500")
+	}
+
+	log.Printf("파싱된 라이센스 정보: %+v", licenseInfo)
+
+	// OEM 값이 없으면 에러 반환
+	if licenseInfo.OEM == "" {
+		log.Printf("OEM 값을 찾을 수 없습니다")
+		return "", fmt.Errorf("500")
+	}
+
+	// 라이센스 유효성 검사
+	expired, isBeforeIssueDate, err := IsLicenseExpired("password", "salt")
+	if err != nil {
+		log.Printf("라이센스 상태 확인 실패: %v", err)
+		return "", fmt.Errorf("500")
+	}
+
+	var status string
+	if !expired && !isBeforeIssueDate {
+		status = "string" // 라이센스가 유효할 때는 "string"
 	} else {
-		// vm이 아닌 경우 core 값을 빈 문자열로 추가
-		output = append(output, "")
+		status = "Not Found" // 라이센스가 만료되었거나 시작일 이전일 때는 "Not Found"
 	}
 
-	// date
-	cmd = exec.Command("sh", "-c", "cat /root/license_test | grep 'date' | awk '{print $3}'")
-	stdout, err = cmd.CombinedOutput()
+	// 응답 구조체 생성
+	response := LicenseResponse{
+		ExpiryDate: licenseInfo.ExpiryDate,
+		IssuedDate: licenseInfo.IssuedDate,
+		OEM:        licenseInfo.OEM,
+		Status:     status,
+	}
+
+	// JSON으로 변환
+	jsonResponse, err := json.Marshal(response)
 	if err != nil {
-		err_str := strings.ReplaceAll(string(stdout), "\n", "")
-		err = errors.New(err_str)
-		utils.FancyHandleError(err)
-		return
+		log.Printf("JSON 변환 실패: %v", err)
+		return "", fmt.Errorf("500")
 	}
-	license_info = strings.ReplaceAll(string(stdout), "\n", "")
-	output = append(output, string(license_info))
 
-	return
+	return string(jsonResponse), nil
 }
 
 // GenerateKeyAndIV는 password와 salt를 사용하여 key와 iv를 생성합니다
