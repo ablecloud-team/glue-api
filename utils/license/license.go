@@ -112,12 +112,6 @@ func License() (string, error) {
 
 	log.Printf("파싱된 라이센스 정보: %+v", licenseInfo)
 
-	// OEM 값이 없으면 에러 반환
-	if licenseInfo.OEM == "" {
-		log.Printf("OEM 값을 찾을 수 없습니다")
-		return "", fmt.Errorf("500")
-	}
-
 	// 라이센스 유효성 검사
 	expired, isBeforeIssueDate, err := IsLicenseExpired("password", "salt")
 	if err != nil {
