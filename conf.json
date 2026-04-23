@@ -4,7 +4,7 @@
  "remote_root_rsa_id_path": "/root/.ssh/id_rsa",
  "samba_security_type": "normal",
  "glue_protocol": "https",
- "glue_port": "8443",
+ "glue_port": "19200",
  "glue_user": "admin",
  "glue_pw": "SFqGeW0x9BiMuv05hDcPMZegxGBDhbytFVJsu8O7JpE="
 }
